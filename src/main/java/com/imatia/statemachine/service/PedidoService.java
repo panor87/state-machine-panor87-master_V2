@@ -5,14 +5,11 @@ import com.imatia.statemachine.config.Eventos;
 import com.imatia.statemachine.config.Pedido;
 import com.imatia.statemachine.config.PedidoRepository;
 import com.imatia.statemachine.entity.OrderTrackings;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.stereotype.Service;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.Statement;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
@@ -21,14 +18,7 @@ public class PedidoService {
 
     @Autowired
     StateMachine<Estados, Eventos> stateMachine;
-    private PedidoRepository pedidoRepository;
-
-    //URL BD
-    public static final String URL = "jdbc:h2:mem:test";
-
-    //QUERYS
-    public static final String SQL1 = "SELECT tracking_status_id AS Status FROM pedido WHERE order_id = '";
-    public static final String SQL2 = "' ORDER BY actual_date DESC LIMIT 1";
+    private final PedidoRepository pedidoRepository;
 
     public PedidoService(PedidoRepository pedidoRepository) {
         this.pedidoRepository = pedidoRepository;
@@ -37,20 +27,7 @@ public class PedidoService {
     public void getOrders(OrderTrackings orderTrackings){
         for(Pedido order : orderTrackings.getOrderTrackings()){
 
-            Integer actual_status=0;
-            try{
-                String SQL = SQL1 + order.getOrderId() + SQL2;
-                Connection connection = DriverManager.getConnection(URL,"sa","password");
-                Statement stmt = connection.createStatement();
-                ResultSet rs = stmt.executeQuery(SQL);
-
-                while (rs.next()) {
-                    actual_status = Integer.parseInt(rs.getString("Status"));
-                }
-                connection.close();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+            Integer actual_status = pedidoRepository.findTrackingStatusId((int)order.getOrderId());
 
             //FECHA DE GUARDADO EN BASE DE DATOS
             SimpleDateFormat formatter = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
@@ -58,7 +35,7 @@ public class PedidoService {
             order.setActual_date(currentDate);
 
             //SI YA ESTA REGISTRADO EN LA BD
-            if (actual_status != 0){
+            if (actual_status != null){
                 //SI EL ESTADO ENTRANTE ES UNO DE LOS ESTADOS EXISTENTES Y TRANSITABLES
                 if((order.getTrackingStatusId()==Estados.EN_REPARTO.getId() || order.getTrackingStatusId()==Estados.INCIDENCIA_EN_ENTREGA.getId() ||
                     order.getTrackingStatusId()==Estados.ENTREGADO.getId()) && actual_status!=Estados.ENTREGADO.getId()){
@@ -84,6 +61,7 @@ public class PedidoService {
             }
 
         }
+
     }
 
 }
